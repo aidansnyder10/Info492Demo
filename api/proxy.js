@@ -2,8 +2,9 @@
 // This bypasses CORS restrictions by making the call from the server
 
 export default async function handler(req, res) {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Enable CORS (locked to allowed origin when provided)
+    const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
@@ -61,6 +62,48 @@ export default async function handler(req, res) {
             });
         }
         
+        // Handle OpenRouter API requests
+        if (provider === 'openrouter') {
+            const openRouterKey = process.env.OPENROUTER_API_KEY;
+            if (!openRouterKey) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Server missing OpenRouter API key',
+                    message: 'OPENROUTER_API_KEY is not configured on the server.',
+                    status: 500
+                });
+            }
+
+            const refererHeader = req.headers.origin || process.env.APP_REFERER || 'http://localhost:8000';
+            const appTitle = process.env.APP_TITLE || 'AI Phishing Demo';
+
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${openRouterKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': refererHeader,
+                    'X-Title': appTitle
+                },
+                body: JSON.stringify({
+                    model: model || 'meta-llama/llama-3.1-8b-instruct',
+                    messages: [
+                        { role: 'user', content: inputs }
+                    ],
+                    max_tokens: 500,
+                    temperature: 0.7
+                })
+            });
+
+            const data = await response.json();
+            return res.status(response.status).json({
+                success: response.ok,
+                data,
+                response: data.choices?.[0]?.message?.content,
+                status: response.status
+            });
+        }
+
         // Handle Hugging Face API requests (original logic)
         if (!model || !inputs) {
             res.status(400).json({ error: 'Missing required parameters' });

@@ -4,7 +4,6 @@
 class PhishingExperiment {
     constructor() {
         this.claudeToken = localStorage.getItem('claude_token');
-        this.openRouterKey = localStorage.getItem('openrouter_key');
         this.supabaseClient = null;
         this.personas = [];
         this.baselineEmails = [];
@@ -13,7 +12,6 @@ class PhishingExperiment {
         this.currentPersonaIndex = 0;
         
         console.log('Config loading - Claude Token:', this.claudeToken ? 'Found' : 'Not found');
-        console.log('Config loading - OpenRouter Key:', this.openRouterKey ? 'Found' : 'Not found');
         
         this.initSupabase();
         this.loadPersonas();
@@ -211,10 +209,7 @@ class PhishingExperiment {
     }
 
     async generateAIEmails() {
-        if (!this.openRouterKey && !this.claudeToken) {
-            alert('OpenRouter API key or Claude API token required for AI email generation. Please add your token in the token manager.');
-            return;
-        }
+        // Server has OpenRouter key; proceed without client key
 
         this.updateStatus('Generating AI-powered emails using OpenRouter...');
         this.updateIndicator('aiIndicator', '🤖 AI Campaign: Generating...');
@@ -265,12 +260,10 @@ class PhishingExperiment {
 
     async generateAIEmailForPersona(persona) {
         // Try OpenRouter first, then fallback to sophisticated templates
-        if (this.openRouterKey) {
-            try {
-                return await this.generateWithOpenRouter(persona);
-            } catch (error) {
-                console.warn('OpenRouter failed, using sophisticated templates:', error);
-            }
+        try {
+            return await this.generateWithOpenRouter(persona);
+        } catch (error) {
+            console.warn('OpenRouter failed, using sophisticated templates:', error);
         }
         
         // Fallback to sophisticated templates
@@ -339,8 +332,7 @@ Return only valid JSON in this exact format:
                     body: JSON.stringify({
                         provider: 'openrouter',
                         model: model,
-                        inputs: prompt,
-                        openRouterKey: this.openRouterKey
+                        inputs: prompt
                     })
                 });
 

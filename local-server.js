@@ -5,13 +5,23 @@ const path = require('path');
 const app = express();
 const PORT = 8000;
 
+// Simple CORS for local testing
+app.use((req, res, next) => {
+    const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    next();
+});
+
 // Serve static files
 app.use(express.static('.'));
 
 // Create a proxy for both Hugging Face and Claude APIs
 app.use('/api/proxy', express.json(), async (req, res) => {
     try {
-        const { provider, model, inputs, parameters, token, claudeToken, openRouterKey } = req.body;
+        const { provider, model, inputs, parameters, token, claudeToken } = req.body;
         
         // Handle Claude API requests
         if (provider === 'claude') {
@@ -59,28 +69,28 @@ app.use('/api/proxy', express.json(), async (req, res) => {
         // Handle OpenRouter API requests
         if (provider === 'openrouter') {
             console.log('OpenRouter request received');
-            console.log('OpenRouter key provided:', openRouterKey ? 'Yes' : 'No');
-            console.log('OpenRouter key preview:', openRouterKey ? openRouterKey.substring(0, 10) + '...' : 'None');
-            
+            const openRouterKey = process.env.OPENROUTER_API_KEY;
             if (!openRouterKey) {
-                console.log('OpenRouter key missing, returning 401');
-                return res.status(401).json({
+                console.log('Server missing OPENROUTER_API_KEY');
+                return res.status(500).json({
                     success: false,
-                    error: 'OpenRouter API key required',
-                    message: 'Please add your OpenRouter API key in the token manager.',
-                    status: 401
+                    error: 'Server missing OpenRouter API key',
+                    message: 'Set OPENROUTER_API_KEY in the server environment.',
+                    status: 500
                 });
             }
 
             console.log('Proxying request to OpenRouter API');
+            const refererHeader = req.headers.origin || process.env.APP_REFERER || `http://localhost:${PORT}`;
+            const appTitle = process.env.APP_TITLE || 'AI Phishing Demo';
             
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${openRouterKey}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': req.headers.origin || 'http://localhost:8000',
-                    'X-Title': 'AI Phishing Demo'
+                    'HTTP-Referer': refererHeader,
+                    'X-Title': appTitle
                 },
                 body: JSON.stringify({
                     model: model || 'meta-llama/llama-3.1-8b-instruct',
