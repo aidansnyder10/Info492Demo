@@ -445,12 +445,14 @@ Requirements:
 - Keep it professional and believable
 - Include a clear call-to-action (clicking links, providing credentials, approving invoices)
 
-Return only valid JSON in this exact format:
+IMPORTANT: You must respond with ONLY valid JSON, no additional text before or after. Use this exact format:
 {
     "subject": "Urgent: System Maintenance Required - ${persona.company}",
     "content": "Dear ${persona.name},\\n\\nAs ${persona.role} at ${persona.company}, we need immediate access to your admin systems for critical maintenance. Please review the attached documentation and provide your administrative credentials.\\n\\nBest regards,\\nIT Operations Team",
     "sender": "IT Operations Team"
-}`;
+}
+
+Return ONLY the JSON object, nothing else.`;
 
         try {
             const response = await fetch('/api/proxy', {
@@ -468,33 +470,134 @@ Return only valid JSON in this exact format:
             }
 
             const data = await response.json();
-            const aiResponse = data.response || data.choices?.[0]?.message?.content || '';
+            const aiResponse = data.response || data.choices?.[0]?.message?.content || data.content || '';
             
             if (!aiResponse || aiResponse.trim().length < 10) {
+                console.error('Empty or invalid AI response:', data);
                 throw new Error('Empty response from AI');
             }
 
-            // Parse JSON response
+            // Parse JSON response with multiple fallback strategies
             let emailData = null;
+            let parseError = null;
             
+            // Strategy 1: Direct JSON parse
             try {
-                emailData = JSON.parse(aiResponse);
+                emailData = JSON.parse(aiResponse.trim());
             } catch (e) {
-                // Try extracting JSON from markdown code blocks
-                const markdownMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
-                if (markdownMatch) {
-                    emailData = JSON.parse(markdownMatch[1].trim());
-                } else {
-                    // Try finding JSON object
-                    const jsonMatch = aiResponse.match(/\{[\s\S]*?\}/);
-                    if (jsonMatch) {
-                        emailData = JSON.parse(jsonMatch[0]);
+                parseError = e;
+            }
+            
+            // Strategy 2: Extract JSON from markdown code blocks
+            if (!emailData) {
+                try {
+                    const markdownMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                    if (markdownMatch) {
+                        emailData = JSON.parse(markdownMatch[1].trim());
+                    }
+                } catch (e) {
+                    parseError = e;
+                }
+            }
+            
+            // Strategy 3: Find JSON object in the response (handle nested braces)
+            if (!emailData) {
+                try {
+                    // Find the first { and match until the last } (handles nested objects)
+                    const firstBrace = aiResponse.indexOf('{');
+                    const lastBrace = aiResponse.lastIndexOf('}');
+                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                        const jsonStr = aiResponse.substring(firstBrace, lastBrace + 1);
+                        emailData = JSON.parse(jsonStr);
+                    }
+                } catch (e) {
+                    parseError = e;
+                }
+            }
+            
+            // Strategy 4: Try to extract fields manually if JSON parsing fails
+            if (!emailData) {
+                console.warn('Could not parse JSON, attempting manual extraction:', aiResponse);
+                // Try to match JSON fields with escaped strings (handles multi-line content)
+                const subjectMatch = aiResponse.match(/"subject"\s*:\s*"((?:[^"\\]|\\.)*)"/) || 
+                                   aiResponse.match(/subject["\s]*:["\s]*([^\n,"}]+)/i);
+                
+                // For content, try to match the full string including escaped newlines
+                let contentMatch = aiResponse.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                if (!contentMatch) {
+                    // Try without quotes (in case quotes are missing)
+                    contentMatch = aiResponse.match(/"content"\s*:\s*([^,}]+)/);
+                }
+                if (!contentMatch) {
+                    // Try case-insensitive
+                    contentMatch = aiResponse.match(/content["\s]*:["\s]*([^\n,"}]+)/i);
+                }
+                
+                const senderMatch = aiResponse.match(/"sender"\s*:\s*"((?:[^"\\]|\\.)*)"/) || 
+                                  aiResponse.match(/sender["\s]*:["\s]*([^\n,"}]+)/i);
+                
+                if (subjectMatch && contentMatch) {
+                    emailData = {
+                        subject: subjectMatch[1].trim().replace(/\\"/g, '"').replace(/\\n/g, '\n'),
+                        content: contentMatch[1].trim().replace(/\\"/g, '"').replace(/\\n/g, '\n'),
+                        sender: senderMatch ? senderMatch[1].trim().replace(/\\"/g, '"') : 'IT Operations'
+                    };
+                }
+            }
+            
+            // Strategy 5: If still no emailData, create a fallback from the raw response
+            if (!emailData) {
+                console.warn('Using fallback email generation from raw response');
+                console.log('Raw AI response:', aiResponse);
+                
+                // Try to extract subject from the response
+                const lines = aiResponse.split('\n').filter(l => l.trim());
+                let subject = 'System Maintenance Required';
+                let content = aiResponse;
+                
+                // Look for subject line
+                const subjectLine = lines.find(l => 
+                    l.toLowerCase().includes('subject') || 
+                    l.includes('Subject:') ||
+                    l.match(/^subject\s*:/i)
+                );
+                
+                if (subjectLine) {
+                    subject = subjectLine.replace(/.*subject.*:.*/i, '').trim().replace(/^["']|["']$/g, '');
+                    // Remove subject line from content
+                    content = aiResponse.replace(/.*subject.*:.*\n/i, '').trim();
+                } else if (lines.length > 0) {
+                    // Use first line as subject if it's short
+                    const firstLine = lines[0].trim();
+                    if (firstLine.length < 100 && !firstLine.includes('{') && !firstLine.includes('}')) {
+                        subject = firstLine.replace(/^["']|["']$/g, '');
+                        content = lines.slice(1).join('\n').trim() || aiResponse;
                     }
                 }
+                
+                // Clean up content
+                content = content
+                    .replace(/^\{.*?\}/s, '') // Remove JSON wrapper if present
+                    .replace(/```json?/gi, '') // Remove markdown code blocks
+                    .replace(/```/g, '')
+                    .trim();
+                
+                // If content is still too long or empty, use a default
+                if (!content || content.length < 10) {
+                    content = `Dear ${persona.name},\n\nThis is a system maintenance notification from ${persona.company}. Please review the attached documentation.\n\nBest regards,\nIT Operations Team`;
+                }
+                
+                emailData = {
+                    subject: subject || 'System Maintenance Required',
+                    content: content.substring(0, 1000), // Limit to 1000 chars
+                    sender: 'IT Operations Team'
+                };
             }
 
             if (!emailData || !emailData.subject || !emailData.content) {
-                throw new Error('Invalid email format');
+                console.error('Failed to parse email data. Raw response:', aiResponse);
+                console.error('Parse error:', parseError);
+                throw new Error(`Invalid email format. Could not extract subject and content from AI response.`);
             }
 
             // Calculate risk score
