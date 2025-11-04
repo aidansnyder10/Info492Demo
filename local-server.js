@@ -84,32 +84,69 @@ app.use('/api/proxy', express.json(), async (req, res) => {
             const refererHeader = req.headers.origin || process.env.APP_REFERER || `http://localhost:${PORT}`;
             const appTitle = process.env.APP_TITLE || 'AI Phishing Demo';
             
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${openRouterKey}`,
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': refererHeader,
-                    'X-Title': appTitle
-                },
-                body: JSON.stringify({
-                    model: model || 'meta-llama/llama-3.1-8b-instruct',
-                    messages: [{
-                        role: 'user',
-                        content: inputs
-                    }],
-                    max_tokens: 500,
-                    temperature: 0.7
-                })
-            });
+            const requestBody = {
+                model: model || 'meta-llama/llama-3.1-8b-instruct',
+                messages: [{
+                    role: 'user',
+                    content: inputs
+                }],
+                max_tokens: 500,
+                temperature: 0.7
+            };
+            
+            console.log('Request body:', JSON.stringify(requestBody, null, 2));
+            
+            let response;
+            try {
+                response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${openRouterKey}`,
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': refererHeader,
+                        'X-Title': appTitle
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+            } catch (fetchError) {
+                console.error('Fetch error:', fetchError);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Network error',
+                    message: fetchError.message,
+                    status: 500
+                });
+            }
 
-            const data = await response.json();
+            let data;
+            try {
+                const responseText = await response.text();
+                if (responseText.trim()) {
+                    data = JSON.parse(responseText);
+                } else {
+                    data = { error: { message: 'Empty response from OpenRouter' } };
+                }
+            } catch (parseError) {
+                console.error('Failed to parse OpenRouter response:', parseError);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Parse error',
+                    message: 'Failed to parse response from OpenRouter API',
+                    status: 500
+                });
+            }
+            
+            // Log error details for debugging
+            if (!response.ok) {
+                console.error('OpenRouter API error response:', JSON.stringify(data, null, 2));
+            }
             
             return res.status(response.status).json({
                 success: response.ok,
                 response: data.choices?.[0]?.message?.content || data.error?.message || 'No response',
                 content: data.choices?.[0]?.message?.content,
                 error: data.error,
+                data: data,
                 status: response.status
             });
         }

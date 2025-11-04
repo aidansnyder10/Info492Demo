@@ -14,9 +14,32 @@ class HackerDashboard {
         this.loadPersonas();
         this.loadCampaigns();
         this.setupEventListeners();
+        this.setupEvaluationMetricsListener();
         this.updateKPIs();
         this.generateActivityChart();
         this.updateQuickStats();
+    }
+    
+    setupEvaluationMetricsListener() {
+        // Listen for evaluation metrics updates from bank admin dashboard
+        window.addEventListener('evaluationMetricsUpdated', (event) => {
+            this.updateKPIs();
+            this.updateEvaluationDisplay(event.detail);
+        });
+        
+        // Poll for metrics updates
+        setInterval(() => {
+            this.loadEvaluationMetrics();
+        }, 3000);
+    }
+    
+    loadEvaluationMetrics() {
+        const saved = localStorage.getItem('demo3_evaluation_metrics');
+        if (saved) {
+            const metrics = JSON.parse(saved);
+            this.updateKPIs(metrics);
+            this.updateEvaluationDisplay(metrics);
+        }
     }
 
     loadPersonas() {
@@ -175,7 +198,7 @@ class HackerDashboard {
         }
     }
     
-    updateKPIs() {
+    updateKPIs(evaluationMetrics = null) {
         const activeCampaigns = this.campaigns.filter(c => c.emails.length > 0 || c === this.currentCampaign).length;
         const totalEmails = this.campaigns.reduce((sum, c) => sum + c.emails.length, 0);
         const targets = this.selectedTargets.length;
@@ -189,10 +212,150 @@ class HackerDashboard {
         document.getElementById('kpi-emails-change').textContent = `${totalEmails} total`;
         document.getElementById('kpi-targets-change').textContent = targets > 0 ? `${targets} selected` : '0 active';
         
-        // Success rate (simulated - in real scenario this would track actual responses)
-        const successRate = totalEmails > 0 ? Math.floor(Math.random() * 15 + 5) : 0;
-        document.getElementById('kpi-success-rate').textContent = `${successRate}%`;
-        document.getElementById('kpi-success-change').textContent = totalEmails > 0 ? 'Monitoring...' : 'Pending';
+        // Success rate - use real evaluation metrics if available
+        if (evaluationMetrics && evaluationMetrics.totalSent > 0) {
+            const bypassRate = evaluationMetrics.bypassRate || 0; // Bypass rate = success rate
+            document.getElementById('kpi-success-rate').textContent = `${bypassRate.toFixed(1)}%`;
+            const detected = evaluationMetrics.detected || 0;
+            document.getElementById('kpi-success-change').textContent = `${detected} detected, ${evaluationMetrics.bypassed} bypassed`;
+        } else {
+            // Load from storage if not provided
+            const saved = localStorage.getItem('demo3_evaluation_metrics');
+            if (saved) {
+                const metrics = JSON.parse(saved);
+                if (metrics.totalSent > 0) {
+                    document.getElementById('kpi-success-rate').textContent = `${metrics.bypassRate.toFixed(1)}%`;
+                    document.getElementById('kpi-success-change').textContent = `${metrics.detected} detected, ${metrics.bypassed} bypassed`;
+                } else {
+                    document.getElementById('kpi-success-rate').textContent = '0%';
+                    document.getElementById('kpi-success-change').textContent = totalEmails > 0 ? 'Monitoring...' : 'Pending';
+                }
+            } else {
+                document.getElementById('kpi-success-rate').textContent = '0%';
+                document.getElementById('kpi-success-change').textContent = totalEmails > 0 ? 'Monitoring...' : 'Pending';
+            }
+        }
+    }
+    
+    updateEvaluationDisplay(metrics) {
+        // Update detailed evaluation metrics display if element exists
+        const evalPanel = document.getElementById('evaluationMetricsPanel');
+        if (!evalPanel || !metrics) return;
+        
+        const isAnalyzing = metrics.status === 'analyzing' || metrics.pending > 0;
+        const statusBadge = isAnalyzing 
+            ? `<span style="background: #ffaa00; color: #000; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;"><i class="fas fa-spinner fa-spin"></i> Analyzing...</span>`
+            : `<span style="background: #00ff88; color: #000; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;"><i class="fas fa-check"></i> Complete</span>`;
+        
+        const pendingInfo = metrics.pending > 0 
+            ? `<div style="background: #ffaa0033; border-left: 3px solid #ffaa00; padding: 10px; border-radius: 6px; margin: 10px 0;">
+                <strong style="color: #ffaa00;">${metrics.pending} email${metrics.pending > 1 ? 's' : ''} pending detection</strong>
+                ${metrics.nextDetectionInMinutes !== null 
+                    ? metrics.nextDetectionInMinutes === -1
+                        ? '<div style="color: #ffaa00; font-size: 12px; margin-top: 5px;"><i class="fas fa-spinner fa-spin"></i> Processing overdue detections...</div>'
+                        : metrics.nextDetectionInMinutes >= 0
+                            ? `<div style="color: #888; font-size: 12px; margin-top: 5px;">Next detection expected in ~${metrics.nextDetectionInMinutes} minute${metrics.nextDetectionInMinutes !== 1 ? 's' : ''}</div>`
+                            : '<div style="color: #888; font-size: 12px; margin-top: 5px;">Detection in progress...</div>'
+                    : '<div style="color: #888; font-size: 12px; margin-top: 5px;">Detection in progress...</div>'}
+            </div>`
+            : '';
+        
+        // Format metrics display
+        evalPanel.innerHTML = `
+            <div style="background: #1a1f35; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="color: #00ff88; margin: 0;"><i class="fas fa-chart-line"></i> Attack Effectiveness Metrics</h4>
+                    ${statusBadge}
+                </div>
+                
+                ${pendingInfo}
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div>
+                        <div style="color: #888; font-size: 12px;">Total Emails Sent</div>
+                        <div style="color: #fff; font-size: 24px; font-weight: bold;">${metrics.totalSent}</div>
+                        ${metrics.pending > 0 ? `<div style="color: #ffaa00; font-size: 11px;">${metrics.pending} analyzing</div>` : ''}
+                    </div>
+                    <div>
+                        <div style="color: #888; font-size: 12px;">Detected (Blocked/Reported)</div>
+                        <div style="color: #ff4444; font-size: 24px; font-weight: bold;">${metrics.detected}</div>
+                        <div style="color: #888; font-size: 12px;">
+                            ${metrics.detectionRate.toFixed(1)}% detected
+                            ${metrics.projectedDetectionRate && metrics.projectedDetectionRate > metrics.detectionRate 
+                                ? `<span style="color: #ffaa00;">(projected: ${metrics.projectedDetectionRate.toFixed(1)}%)</span>` 
+                                : ''}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color: #888; font-size: 12px;">Bypassed (Successful)</div>
+                        <div style="color: #00ff88; font-size: 24px; font-weight: bold;">${metrics.bypassed}</div>
+                        <div style="color: #888; font-size: 12px;">
+                            ${metrics.bypassRate.toFixed(1)}% success rate
+                            ${metrics.projectedBypassRate && metrics.projectedBypassRate > metrics.bypassRate 
+                                ? `<span style="color: #ffaa00;">(projected: ${metrics.projectedBypassRate.toFixed(1)}%)</span>` 
+                                : ''}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color: #888; font-size: 12px;">Avg Detection Time</div>
+                        <div style="color: #ffaa00; font-size: 24px; font-weight: bold;">
+                            ${metrics.avgDetectionTimeMinutes > 0 ? metrics.avgDetectionTimeMinutes.toFixed(1) + 'm' : '-'}
+                        </div>
+                        ${metrics.nextDetectionInMinutes !== null && metrics.nextDetectionInMinutes > 0 && metrics.avgDetectionTimeMinutes === 0
+                            ? `<div style="color: #888; font-size: 11px;">First detection: ~${metrics.nextDetectionInMinutes}m</div>`
+                            : metrics.nextDetectionInMinutes === -1 && metrics.avgDetectionTimeMinutes === 0
+                            ? '<div style="color: #ffaa00; font-size: 11px;">Processing...</div>'
+                            : ''}
+                    </div>
+                </div>
+                
+                ${this.formatMetricsByLevel(metrics.byAttackLevel)}
+                ${this.formatMetricsByModel(metrics.byModel)}
+            </div>
+        `;
+    }
+    
+    formatMetricsByLevel(byLevel) {
+        if (!byLevel || Object.keys(byLevel).length === 0) return '';
+        
+        let html = '<div style="margin-top: 20px;"><h5 style="color: #fff; margin-bottom: 10px;">By Attack Level:</h5>';
+        ['basic', 'advanced', 'expert'].forEach(level => {
+            const metrics = byLevel[level];
+            if (metrics) {
+                html += `
+                    <div style="background: #0f1529; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                        <strong style="color: #ffaa00; text-transform: capitalize;">${level}:</strong>
+                        <span style="color: #888; margin-left: 10px;">${metrics.total} sent</span>
+                        <span style="color: #ff4444; margin-left: 10px;">${metrics.detected} detected (${metrics.detectionRate}%)</span>
+                        <span style="color: #00ff88; margin-left: 10px;">${metrics.bypassed} bypassed (${metrics.bypassRate}%)</span>
+                    </div>
+                `;
+            }
+        });
+        html += '</div>';
+        return html;
+    }
+    
+    formatMetricsByModel(byModel) {
+        if (!byModel || Object.keys(byModel).length === 0) return '';
+        
+        let html = '<div style="margin-top: 20px;"><h5 style="color: #fff; margin-bottom: 10px;">By AI Model:</h5>';
+        Object.entries(byModel).forEach(([model, metrics]) => {
+            if (metrics) {
+                const modelName = model.split('/').pop() || model;
+                html += `
+                    <div style="background: #0f1529; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                        <strong style="color: #667eea;">${modelName}:</strong>
+                        <span style="color: #888; margin-left: 10px;">${metrics.total} sent</span>
+                        <span style="color: #ff4444; margin-left: 10px;">${metrics.detected} detected (${metrics.detectionRate}%)</span>
+                        <span style="color: #00ff88; margin-left: 10px;">${metrics.bypassed} bypassed (${metrics.bypassRate}%)</span>
+                        ${metrics.avgDetectionTimeMinutes > 0 ? `<span style="color: #ffaa00; margin-left: 10px;">Avg: ${metrics.avgDetectionTimeMinutes.toFixed(1)}m</span>` : ''}
+                    </div>
+                `;
+            }
+        });
+        html += '</div>';
+        return html;
     }
     
     generateActivityChart() {
@@ -374,29 +537,63 @@ class HackerDashboard {
             try {
                 const email = await this.generateEmailForPersona(persona, model, attackLevel, urgencyLevel);
                 if (email) {
+                    console.log(`✓ Successfully generated email ${i + 1}/${this.selectedTargets.length} for ${persona.name} (ID: ${email.id}, Persona ID: ${persona.id})`);
                     this.generatedEmails.push(email);
                     successCount++;
                 } else {
+                    console.log(`✗ Failed to generate email ${i + 1}/${this.selectedTargets.length} for ${persona.name} - returned null`);
                     failCount++;
                 }
             } catch (error) {
-                console.error(`Error generating email for ${persona.name}:`, error);
+                console.error(`✗ Error generating email ${i + 1}/${this.selectedTargets.length} for ${persona.name}:`, error);
                 failCount++;
             }
 
             // Small delay between generations
             await new Promise(resolve => setTimeout(resolve, 500));
         }
+        
+        console.log(`Loop complete. this.generatedEmails.length = ${this.generatedEmails.length}, successCount = ${successCount}, failCount = ${failCount}`);
 
         // Save emails to campaign and localStorage
+        console.log(`=== EXECUTE ATTACK COMPLETE ===`);
+        console.log(`Successfully generated: ${successCount}, Failed: ${failCount}`);
+        console.log(`this.generatedEmails.length: ${this.generatedEmails.length}`);
+        console.log('All generated emails:', this.generatedEmails.map(e => ({
+            id: e?.id,
+            target: e?.targetPersona?.name,
+            personaId: e?.targetPersona?.id,
+            subject: e?.subject
+        })));
+        
         if (this.generatedEmails.length > 0) {
             this.currentCampaign.emails.push(...this.generatedEmails);
             this.saveCampaigns();
+            console.log('About to save emails to bank inbox...');
             this.saveEmailsToBankInbox();
             this.displayResults();
             this.updateKPIs();
             this.updateQuickStats();
             this.generateActivityChart(); // Refresh chart with new activity
+            
+            // Load evaluation metrics immediately and then keep refreshing
+            setTimeout(() => {
+                this.loadEvaluationMetrics();
+            }, 500);
+            
+            // Set up continuous refresh while analyzing (every 5 seconds)
+            if (this.metricsRefreshInterval) {
+                clearInterval(this.metricsRefreshInterval);
+            }
+            this.metricsRefreshInterval = setInterval(() => {
+                this.loadEvaluationMetrics();
+                // Stop refreshing after 35 minutes (longer than max detection time)
+                const checkTime = Date.now() - (new Date(this.generatedEmails[0]?.timestamp || Date.now())).getTime();
+                if (checkTime > 35 * 60 * 1000) {
+                    clearInterval(this.metricsRefreshInterval);
+                    this.metricsRefreshInterval = null;
+                }
+            }, 5000);
         }
 
         statusDiv.textContent = `Attack completed! Generated ${successCount} emails successfully.${failCount > 0 ? ` ${failCount} failed.` : ''}`;
@@ -465,11 +662,14 @@ Return ONLY the JSON object, nothing else.`;
                 })
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
+                const errorMessage = data.error?.message || data.message || `API error: ${response.status}`;
+                console.error('API Error Response:', data);
+                throw new Error(errorMessage);
             }
 
-            const data = await response.json();
             const aiResponse = data.response || data.choices?.[0]?.message?.content || data.content || '';
             
             if (!aiResponse || aiResponse.trim().length < 10) {
@@ -603,8 +803,11 @@ Return ONLY the JSON object, nothing else.`;
             // Calculate risk score
             const riskScore = this.calculateRiskScore(emailData);
 
+            // Generate unique ID with timestamp, persona ID, and random component
+            const uniqueId = `email_${Date.now()}_${persona.id}_${Math.random().toString(36).substring(2, 9)}`;
+            
             return {
-                id: `email_${Date.now()}_${persona.id}`,
+                id: uniqueId,
                 campaignId: this.currentCampaign.id,
                 targetPersona: persona,
                 subject: emailData.subject,
@@ -661,19 +864,64 @@ Return ONLY the JSON object, nothing else.`;
     }
 
     saveEmailsToBankInbox() {
+        console.log('=== SAVE EMAILS TO BANK INBOX ===');
+        console.log(`this.generatedEmails array has ${this.generatedEmails.length} emails`);
+        console.log('Generated emails details:', this.generatedEmails.map(e => ({
+            id: e.id,
+            target: e.targetPersona?.name,
+            personaId: e.targetPersona?.id,
+            subject: e.subject
+        })));
+        
         // Save emails to localStorage so bank admin dashboard can access them
         const existingEmails = JSON.parse(localStorage.getItem('demo3_bank_inbox') || '[]');
-        const newEmails = this.generatedEmails.map(email => ({
-            ...email,
-            receivedAt: new Date().toISOString(),
-            read: false,
-            riskLevel: email.riskScore > 70 ? 'high' : email.riskScore > 40 ? 'medium' : 'low'
-        }));
+        const existingIds = new Set(existingEmails.map(e => e.id));
         
-        localStorage.setItem('demo3_bank_inbox', JSON.stringify([...existingEmails, ...newEmails]));
+        console.log(`Existing emails in inbox: ${existingEmails.length}`);
+        console.log('Existing email IDs:', Array.from(existingIds));
+        
+        const newEmails = this.generatedEmails
+            .filter(email => {
+                const isNew = !existingIds.has(email.id);
+                if (!isNew) {
+                    console.log(`Skipping duplicate email ID: ${email.id} for ${email.targetPersona?.name}`);
+                }
+                return isNew;
+            })
+            .map(email => ({
+                ...email,
+                receivedAt: new Date().toISOString(),
+                read: false,
+                riskLevel: email.riskScore > 70 ? 'high' : email.riskScore > 40 ? 'medium' : 'low'
+            }));
+        
+        console.log(`Saving ${newEmails.length} new emails to bank inbox (total in generatedEmails array: ${this.generatedEmails.length})`);
+        console.log('New email IDs:', newEmails.map(e => e.id));
+        console.log('New email targets:', newEmails.map(e => ({ id: e.id, target: e.targetPersona?.name, personaId: e.targetPersona?.id })));
+        
+        const allEmails = [...existingEmails, ...newEmails];
+        localStorage.setItem('demo3_bank_inbox', JSON.stringify(allEmails));
+        
+        console.log('Total emails in bank inbox after save:', allEmails.length);
+        console.log('Final email list:', allEmails.map(e => ({ id: e.id, target: e.targetPersona?.name })));
+        
+        // Verify the save by reading back from localStorage
+        const verifySaved = JSON.parse(localStorage.getItem('demo3_bank_inbox') || '[]');
+        console.log('Verification: Read back from localStorage:', verifySaved.length, 'emails');
+        console.log('Verification: Email IDs:', verifySaved.map(e => e.id));
+        
+        console.log('=== END SAVE ===');
         
         // Trigger event for bank admin dashboard to refresh
         window.dispatchEvent(new CustomEvent('newEmailsReceived', { detail: newEmails }));
+        
+        // Also trigger a storage event manually for cross-tab sync (if in different tabs)
+        // This ensures the bank admin dashboard picks up changes even if CustomEvent doesn't propagate
+        window.dispatchEvent(new StorageEvent('storage', {
+            key: 'demo3_bank_inbox',
+            newValue: JSON.stringify(allEmails),
+            oldValue: JSON.stringify(existingEmails)
+        }));
     }
 
     displayResults() {
@@ -726,11 +974,17 @@ Return ONLY the JSON object, nothing else.`;
             </div>
             <div style="margin-top: 20px; padding: 15px; background: #0f1529; border-radius: 8px; border-left: 4px solid #00ff88;">
                 <p style="color: #00ff88; margin: 0;">
-                    <i class="fas fa-check-circle"></i> <strong>Deployment Complete:</strong> ${this.generatedEmails.length} emails generated and delivered to Bank Admin inbox. 
-                    Switch to Bank Admin Dashboard to view them.
+                    <i class="fas fa-check-circle"></i> <strong>Deployment Complete:</strong> ${this.generatedEmails.length} new emails generated and delivered to Bank Admin inbox. 
+                    <span style="color: #888; font-size: 12px;">(Note: New emails are added to existing emails in the inbox. Use "Clear Inbox" in Bank Admin Dashboard to start fresh.)</span><br>
+                    Automated security analysis is running. Metrics will update in real-time as emails are detected.
                 </p>
             </div>
         `;
+        
+        // Load evaluation metrics immediately
+        setTimeout(() => {
+            this.loadEvaluationMetrics();
+        }, 500);
     }
 }
 
