@@ -706,6 +706,19 @@ function switchDemo(demoType) {
     document.querySelectorAll('.demo-content').forEach(content => content.classList.remove('active'));
     
     // Add active class to selected tab
-    event.target.classList.add('active');
-    document.getElementById(demoType + '-content').classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    } else {
+        // Fallback if event is not available
+        document.querySelectorAll('.tab-btn').forEach((btn, index) => {
+            if (btn.textContent.includes(demoType.replace('demo', 'Demo'))) {
+                btn.classList.add('active');
+            }
+        });
+    }
+    
+    const contentElement = document.getElementById(demoType + '-content');
+    if (contentElement) {
+        contentElement.classList.add('active');
+    }
 }
