@@ -69,12 +69,14 @@ export default async function handler(req, res) {
                 return res.status(500).json({
                     success: false,
                     error: 'Server missing OpenRouter API key',
-                    message: 'OPENROUTER_API_KEY is not configured on the server.',
+                    message: 'OPENROUTER_API_KEY is not configured on the server. Please set this environment variable in your Vercel project settings.',
                     status: 500
                 });
             }
 
-            const refererHeader = req.headers.origin || process.env.APP_REFERER || 'http://localhost:8000';
+            // Use the request origin (for CORS) or fallback to environment variable
+            // This ensures it works on both localhost and deployed sites
+            const refererHeader = req.headers.origin || req.headers.referer || process.env.APP_REFERER || 'https://your-site.vercel.app';
             const appTitle = process.env.APP_TITLE || 'AI Phishing Demo';
 
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
