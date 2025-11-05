@@ -52,7 +52,9 @@ class HackerDashboard {
                 department: "Information Technology",
                 company: "First National Bank",
                 email: "john.doe@firstnational.com",
-                background: "5 years experience managing core banking systems and server infrastructure"
+                location: "New York HQ",
+                phone: "x3201",
+                accessLevel: "High"
             },
             {
                 id: 2,
@@ -61,7 +63,9 @@ class HackerDashboard {
                 department: "Information Technology",
                 company: "Metropolitan Credit Union",
                 email: "jane.smith@metrocu.org",
-                background: "10 years managing network infrastructure, firewalls, and security systems"
+                location: "Chicago Branch",
+                phone: "x3150",
+                accessLevel: "High"
             },
             {
                 id: 3,
@@ -70,7 +74,9 @@ class HackerDashboard {
                 department: "Information Technology",
                 company: "Regional Financial Corp",
                 email: "m.chen@regionalfinance.com",
-                background: "CISSP certified, manages customer data and transaction databases"
+                location: "San Francisco HQ",
+                phone: "x3185",
+                accessLevel: "Critical"
             },
             {
                 id: 4,
@@ -79,7 +85,9 @@ class HackerDashboard {
                 department: "Information Security",
                 company: "Prestige Investment Group",
                 email: "s.williams@prestige-invest.com",
-                background: "Certified security professional, manages access controls and security policies"
+                location: "Boston HQ",
+                phone: "x4102",
+                accessLevel: "Critical"
             },
             {
                 id: 5,
@@ -88,7 +96,9 @@ class HackerDashboard {
                 department: "Operations",
                 company: "Community Trust Bank",
                 email: "d.rodriguez@communitytrust.com",
-                background: "8 years managing IT operations, backup systems, and disaster recovery"
+                location: "Miami Branch",
+                phone: "x3055",
+                accessLevel: "High"
             },
             {
                 id: 6,
@@ -97,7 +107,9 @@ class HackerDashboard {
                 department: "Information Technology",
                 company: "Capital City Bank",
                 email: "l.thompson@capitalcity.bank",
-                background: "MBA in IT, 12 years managing banking applications and user access"
+                location: "Washington DC HQ",
+                phone: "x3250",
+                accessLevel: "High"
             },
             {
                 id: 7,
@@ -106,7 +118,9 @@ class HackerDashboard {
                 department: "Information Technology",
                 company: "United Financial Services",
                 email: "r.kim@unitedfinancial.com",
-                background: "Certified cloud architect, manages server infrastructure and virtualization"
+                location: "Seattle HQ",
+                phone: "x3301",
+                accessLevel: "High"
             },
             {
                 id: 8,
@@ -115,7 +129,9 @@ class HackerDashboard {
                 department: "Risk & Compliance",
                 company: "Heritage Bank & Trust",
                 email: "a.foster@heritagebank.com",
-                background: "7 years managing regulatory compliance systems and audit trails"
+                location: "Atlanta Branch",
+                phone: "x4205",
+                accessLevel: "Medium"
             },
             {
                 id: 9,
@@ -124,7 +140,9 @@ class HackerDashboard {
                 department: "Information Security",
                 company: "SecureFirst Bank",
                 email: "j.wilson@securefirst.com",
-                background: "Former cybersecurity analyst, manages SIEM and incident response systems"
+                location: "Dallas HQ",
+                phone: "x4150",
+                accessLevel: "Critical"
             },
             {
                 id: 10,
@@ -133,7 +151,9 @@ class HackerDashboard {
                 department: "Information Technology",
                 company: "Friendly Neighborhood Bank",
                 email: "m.garcia@friendlybank.com",
-                background: "15 years managing user accounts, permissions, and identity management systems"
+                location: "Los Angeles HQ",
+                phone: "x3105",
+                accessLevel: "High"
             }
         ];
 
@@ -152,7 +172,12 @@ class HackerDashboard {
                 <label for="target_${persona.id}" style="cursor: pointer; color: #e0e0e0;">
                     <strong>${persona.name}</strong><br>
                     <small>${persona.role}</small><br>
-                    <small style="color: #888;">${persona.company}</small>
+                    <small style="color: #888;">${persona.department}</small><br>
+                    <small style="color: #888;">${persona.company}</small><br>
+                    <small style="color: #aaa; font-size: 0.85em;">${persona.email}</small><br>
+                    <small style="color: #aaa; font-size: 0.85em;">📍 ${persona.location || 'N/A'}</small><br>
+                    <small style="color: #aaa; font-size: 0.85em;">📞 ${persona.phone || 'N/A'}</small><br>
+                    <small style="color: ${persona.accessLevel === 'Critical' ? '#ff4444' : persona.accessLevel === 'High' ? '#ff8800' : '#00aa44'}; font-weight: 600;">🔐 ${persona.accessLevel || 'N/A'}</small>
                 </label>
             `;
             targetGrid.appendChild(targetCard);
