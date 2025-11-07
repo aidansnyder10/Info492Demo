@@ -16,7 +16,6 @@ class HackerDashboard {
         this.setupEventListeners();
         this.setupEvaluationMetricsListener();
         this.updateKPIs();
-        this.generateActivityChart();
         this.updateQuickStats();
     }
     
@@ -383,32 +382,16 @@ class HackerDashboard {
         return html;
     }
     
-    generateActivityChart() {
-        const chartContainer = document.getElementById('activityChart');
-        if (!chartContainer) return;
-        
-        // Generate 24 bars for last 24 hours
-        const hours = 24;
-        const bars = [];
-        
-        for (let i = 0; i < hours; i++) {
-            // Random activity level, with some spikes
-            const baseLevel = Math.random() * 30;
-            const spike = Math.random() < 0.1 ? Math.random() * 50 + 30 : 0;
-            const height = Math.min(100, baseLevel + spike);
-            
-            bars.push(`<div class="chart-bar" style="height: ${height}%;" title="Hour ${i}: ${Math.round(height)} events"></div>`);
-        }
-        
-        chartContainer.innerHTML = bars.join('');
-    }
-    
     updateQuickStats() {
         const totalEmails = this.campaigns.reduce((sum, c) => sum + c.emails.length, 0);
         document.getElementById('stat-total-emails').textContent = totalEmails;
         
         if (totalEmails > 0) {
             const allEmails = this.campaigns.flatMap(c => c.emails);
+            // Calculate average risk score using dataset-based risk scores
+            // Risk scores are calculated using patterns from Seven Phishing Email Datasets:
+            // https://figshare.com/articles/dataset/Seven_Phishing_Email_Datasets/25432108
+            // Each email's riskScore is computed by PhishingRiskScorer based on subject, content, URLs, sender, etc.
             const avgRisk = Math.round(allEmails.reduce((sum, e) => sum + (e.riskScore || 50), 0) / allEmails.length);
             document.getElementById('stat-avg-risk').textContent = `${avgRisk}/100`;
             
@@ -599,7 +582,6 @@ class HackerDashboard {
             this.displayResults();
             this.updateKPIs();
             this.updateQuickStats();
-            this.generateActivityChart(); // Refresh chart with new activity
             
             // Load evaluation metrics immediately and then keep refreshing
             setTimeout(() => {
@@ -825,8 +807,16 @@ Return ONLY the JSON object, nothing else.`;
                 throw new Error(`Invalid email format. Could not extract subject and content from AI response.`);
             }
 
-            // Calculate risk score
-            const riskScore = this.calculateRiskScore(emailData);
+            // Extract URLs from content for risk analysis
+            const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+            const urls = emailData.content.match(urlRegex) || [];
+            
+            // Calculate risk score using dataset-based patterns
+            // Based on Seven Phishing Email Datasets: https://figshare.com/articles/dataset/Seven_Phishing_Email_Datasets/25432108
+            const riskScore = this.calculateRiskScore({
+                ...emailData,
+                urls: urls
+            });
 
             // Generate unique ID with timestamp, persona ID, and random component
             const uniqueId = `email_${Date.now()}_${persona.id}_${Math.random().toString(36).substring(2, 9)}`;
@@ -844,6 +834,7 @@ Return ONLY the JSON object, nothing else.`;
                 attackLevel: attackLevel,
                 urgencyLevel: urgencyLevel,
                 riskScore: riskScore,
+                urls: urls, // Store URLs for analysis
                 status: 'delivered'
             };
 
@@ -854,33 +845,16 @@ Return ONLY the JSON object, nothing else.`;
     }
 
     calculateRiskScore(emailData) {
-        let score = 50; // Base score
+        // Use the PhishingRiskScorer based on patterns from Seven Phishing Email Datasets
+        // https://figshare.com/articles/dataset/Seven_Phishing_Email_Datasets/25432108
+        if (!this.phishingRiskScorer) {
+            this.phishingRiskScorer = new PhishingRiskScorer();
+        }
         
-        const content = (emailData.content || '').toLowerCase();
-        const subject = (emailData.subject || '').toLowerCase();
-
-        // High urgency indicators
-        if (subject.includes('urgent') || subject.includes('critical') || subject.includes('immediate')) {
-            score += 20;
-        }
-        if (content.includes('immediately') || content.includes('asap') || content.includes('right away')) {
-            score += 15;
-        }
-
-        // Suspicious keywords
-        if (content.includes('credentials') || content.includes('password') || content.includes('login')) {
-            score += 15;
-        }
-        if (content.includes('click here') || content.includes('verify') || content.includes('confirm')) {
-            score += 10;
-        }
-
-        // Professional indicators (reduce risk slightly)
-        if (content.includes('please') || content.includes('thank you')) {
-            score -= 5;
-        }
-
-        return Math.min(100, Math.max(0, score));
+        // Calculate risk score using dataset-based patterns
+        return this.phishingRiskScorer.calculateRiskScore(emailData, {
+            senderEmail: emailData.senderEmail || emailData.sender
+        });
     }
 
     generateSenderEmail(senderName) {

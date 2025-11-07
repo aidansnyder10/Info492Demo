@@ -625,41 +625,6 @@
             border-radius: 6px;
         }
 
-        /* Activity Timeline */
-        .activity-timeline {
-            background: #1a1f3a;
-            border: 2px solid #333;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-
-        .activity-chart {
-            height: 200px;
-            background: #0f1529;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-            position: relative;
-            display: flex;
-            align-items: flex-end;
-            gap: 8px;
-        }
-
-        .chart-bar {
-            flex: 1;
-            background: linear-gradient(to top, #ff4444, #ff6666);
-            border-radius: 4px 4px 0 0;
-            min-height: 10px;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .chart-bar:hover {
-            background: linear-gradient(to top, #ff6666, #ff8888);
-            transform: scaleY(1.1);
-        }
 
         /* Campaign Metrics Table */
         .metrics-table {
@@ -1425,19 +1390,6 @@
                 </div>
             </div>
 
-            <!-- Activity Timeline -->
-            <div class="activity-timeline">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="color: #ff6b6b; margin: 0; display: flex; align-items: center; gap: 10px;">
-                        <i class="fas fa-chart-line"></i> Activity Timeline (Last 24h)
-                    </h3>
-                    <div style="font-size: 12px; color: #888;">Events per hour</div>
-                </div>
-                <div class="activity-chart" id="activityChart">
-                    <!-- Chart bars will be generated here -->
-                </div>
-            </div>
-
             <div class="hacker-sections">
                 <!-- Campaign Management -->
                 <div class="hacker-card">
@@ -1745,6 +1697,7 @@
     </div>
 
     <script src="config-simple.js"></script>
+    <script src="phishing-risk-scorer.js"></script>
     <script src="demo3-hacker-dashboard.js"></script>
     <script src="demo3-bank-admin-dashboard.js"></script>
     <script src="demo3-auth.js"></script>
