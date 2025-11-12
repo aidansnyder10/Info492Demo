@@ -5,21 +5,360 @@ const path = require('path');
 const app = express();
 const PORT = 8000;
 
+// ============================================================================
+// User Engagement Simulation Engine
+// ============================================================================
+
+// Store events in memory (for demo purposes)
+// In production, use a database (SQLite, PostgreSQL, etc.)
+const events = [];
+
+// Simulation parameters (based on real-world phishing statistics)
+const SIMULATION_PARAMS = {
+    // Probability an email will be opened
+    pOpen: {
+        basic: 0.25,      // 25% for basic phishing
+        advanced: 0.45,   // 45% for advanced (spear-phishing)
+        expert: 0.54      // 54% for expert (AI-generated spear-phishing)
+    },
+    // Probability a link will be clicked IF email was opened
+    pClickIfOpen: {
+        basic: 0.18,      // 18% click if opened (basic)
+        advanced: 0.35,   // 35% click if opened (advanced)
+        expert: 0.54      // 54% click if opened (expert) - matches AI-generated stat
+    },
+    // Probability user reports email BEFORE clicking (security-conscious)
+    pReportBeforeClick: 0.08,  // 8% report before clicking
+    // Probability user reports email AFTER clicking (realized it's phishing)
+    pReportAfterClick: 0.12, // 12% report after clicking
+    // Phantom click probability (scanner/bot clicks)
+    pPhantomClick: 0.01,
+    // Time delays (in minutes, exponential distribution)
+    meanOpenDelay: 10,   // Mean 10 minutes to open
+    meanClickDelay: 6,   // Mean 6 minutes after open to click
+    meanReportDelay: 4   // Mean 4 minutes to report
+};
+
+// Generate exponential delay (realistic user behavior timing)
+function getExponentialDelay(meanMinutes) {
+    // Exponential distribution: -mean * ln(1 - random)
+    // This gives realistic delays where most actions happen quickly, but some take longer
+    return -meanMinutes * Math.log(1 - Math.random());
+}
+
+// Simulate user engagement flow
+function simulateUserFlow(emailId, userId, campaignId, attackLevel, metadata = {}) {
+    const level = attackLevel || 'advanced';
+    const pOpen = SIMULATION_PARAMS.pOpen[level] || SIMULATION_PARAMS.pOpen.advanced;
+    const pClickIfOpen = SIMULATION_PARAMS.pClickIfOpen[level] || SIMULATION_PARAMS.pClickIfOpen.advanced;
+    
+    // Log "sent" event immediately
+    const sentEvent = {
+        event: 'sent',
+        emailId,
+        userId,
+        campaignId,
+        attackLevel: level,
+        timestamp: Date.now(),
+        simulated: true,
+        metadata
+    };
+    events.push(sentEvent);
+    console.log(`[Simulation] Logged sent event for email ${emailId}`);
+    
+    // Decide if user will open email
+    if (Math.random() < pOpen) {
+        // Calculate open delay (exponential distribution)
+        const openDelayMs = getExponentialDelay(SIMULATION_PARAMS.meanOpenDelay) * 60 * 1000;
+        
+        setTimeout(() => {
+            // Log "opened" event
+            const openedEvent = {
+                event: 'opened',
+                emailId,
+                userId,
+                campaignId,
+                timestamp: Date.now(),
+                simulated: true,
+                timeSinceSent: (Date.now() - sentEvent.timestamp) / 1000 / 60 // minutes
+            };
+            events.push(openedEvent);
+            console.log(`[Simulation] Logged opened event for email ${emailId} after ${openedEvent.timeSinceSent.toFixed(1)} minutes`);
+            
+            // Decide if user will click link (only if opened)
+            if (Math.random() < pClickIfOpen) {
+                // Calculate click delay (exponential distribution, after open)
+                const clickDelayMs = getExponentialDelay(SIMULATION_PARAMS.meanClickDelay) * 60 * 1000;
+                
+                setTimeout(() => {
+                    // Log "clicked" event
+                    const clickedEvent = {
+                        event: 'clicked',
+                        emailId,
+                        userId,
+                        campaignId,
+                        timestamp: Date.now(),
+                        simulated: true,
+                        timeSinceOpened: clickDelayMs / 1000 / 60, // minutes
+                        timeSinceSent: (Date.now() - sentEvent.timestamp) / 1000 / 60 // minutes
+                    };
+                    events.push(clickedEvent);
+                    console.log(`[Simulation] Logged clicked event for email ${emailId} after ${clickedEvent.timeSinceSent.toFixed(1)} minutes`);
+                    
+                    // Some users report after clicking (realized it's phishing)
+                    if (Math.random() < SIMULATION_PARAMS.pReportAfterClick) {
+                        const reportDelayMs = getExponentialDelay(SIMULATION_PARAMS.meanReportDelay) * 60 * 1000;
+                        
+                        setTimeout(() => {
+                            const reportedEvent = {
+                                event: 'reported',
+                                emailId,
+                                userId,
+                                campaignId,
+                                timestamp: Date.now(),
+                                simulated: true,
+                                reportedAfterClick: true,
+                                timeSinceSent: (Date.now() - sentEvent.timestamp) / 1000 / 60 // minutes
+                            };
+                            events.push(reportedEvent);
+                            console.log(`[Simulation] Logged reported event for email ${emailId} after click`);
+                        }, reportDelayMs);
+                    }
+                }, clickDelayMs);
+            } else {
+                // User opened but didn't click - some may report before clicking
+                if (Math.random() < SIMULATION_PARAMS.pReportBeforeClick) {
+                    const reportDelayMs = getExponentialDelay(SIMULATION_PARAMS.meanReportDelay) * 60 * 1000;
+                    
+                    setTimeout(() => {
+                        const reportedEvent = {
+                            event: 'reported',
+                            emailId,
+                            userId,
+                            campaignId,
+                            timestamp: Date.now(),
+                            simulated: true,
+                            reportedBeforeClick: true,
+                            timeSinceSent: (Date.now() - sentEvent.timestamp) / 1000 / 60 // minutes
+                        };
+                        events.push(reportedEvent);
+                        console.log(`[Simulation] Logged reported event for email ${emailId} before click`);
+                    }, reportDelayMs);
+                }
+            }
+        }, openDelayMs);
+    } else {
+        // User didn't open - but might have phantom click (scanner/bot)
+        if (Math.random() < SIMULATION_PARAMS.pPhantomClick) {
+            const phantomDelayMs = 1000 + Math.random() * 30000; // 1-30 seconds
+            
+            setTimeout(() => {
+                const phantomEvent = {
+                    event: 'clicked',
+                    emailId,
+                    userId,
+                    campaignId,
+                    timestamp: Date.now(),
+                    simulated: true,
+                    phantom: true, // Mark as phantom click
+                    timeSinceSent: (Date.now() - sentEvent.timestamp) / 1000 / 60 // minutes
+                };
+                events.push(phantomEvent);
+                console.log(`[Simulation] Logged phantom click event for email ${emailId}`);
+            }, phantomDelayMs);
+        }
+    }
+}
+
+// Calculate metrics from events
+function calculateMetrics(campaignId = null) {
+    let filteredEvents = events;
+    
+    // Filter by campaign if provided
+    if (campaignId) {
+        filteredEvents = events.filter(e => e.campaignId === campaignId);
+    }
+    
+    const sent = filteredEvents.filter(e => e.event === 'sent').length;
+    const opened = filteredEvents.filter(e => e.event === 'opened').length;
+    const clicked = filteredEvents.filter(e => e.event === 'clicked').length;
+    const reported = filteredEvents.filter(e => e.event === 'reported').length;
+    
+    // Calculate rates
+    const openRate = sent > 0 ? (opened / sent * 100) : 0;
+    const clickRate = sent > 0 ? (clicked / sent * 100) : 0;
+    const clickThroughRate = opened > 0 ? (clicked / opened * 100) : 0;
+    const reportRate = sent > 0 ? (reported / sent * 100) : 0;
+    
+    // Calculate median time-to-click
+    const clickedEvents = filteredEvents.filter(e => e.event === 'clicked' && e.timeSinceSent !== undefined);
+    const clickTimes = clickedEvents.map(e => e.timeSinceSent).sort((a, b) => a - b);
+    const medianTimeToClick = clickTimes.length > 0 
+        ? clickTimes.length % 2 === 0
+            ? (clickTimes[clickTimes.length / 2 - 1] + clickTimes[clickTimes.length / 2]) / 2
+            : clickTimes[Math.floor(clickTimes.length / 2)]
+        : 0;
+    
+    // Calculate average time-to-open
+    const openedEvents = filteredEvents.filter(e => e.event === 'opened' && e.timeSinceSent !== undefined);
+    const avgTimeToOpen = openedEvents.length > 0
+        ? openedEvents.reduce((sum, e) => sum + e.timeSinceSent, 0) / openedEvents.length
+        : 0;
+    
+    return {
+        sent,
+        opened,
+        clicked,
+        reported,
+        openRate: parseFloat(openRate.toFixed(1)),
+        clickRate: parseFloat(clickRate.toFixed(1)),
+        clickThroughRate: parseFloat(clickThroughRate.toFixed(1)),
+        reportRate: parseFloat(reportRate.toFixed(1)),
+        medianTimeToClick: parseFloat(medianTimeToClick.toFixed(1)),
+        avgTimeToOpen: parseFloat(avgTimeToOpen.toFixed(1)),
+        timestamp: Date.now()
+    };
+}
+
+// ============================================================================
+// Middleware (must be before routes)
+// ============================================================================
+
 // Simple CORS for local testing
 app.use((req, res, next) => {
     const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
     res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') return res.status(200).end();
     next();
 });
 
+// Parse JSON bodies
+app.use(express.json());
+
+// ============================================================================
+// API Endpoints for User Engagement Simulation
+// ============================================================================
+
+// Endpoint: POST /events/generated
+// Logs when an email is generated and starts user engagement simulation
+app.post('/events/generated', (req, res) => {
+    try {
+        const { emailId, userId, campaignId, subject, attackLevel, metadata } = req.body;
+        
+        if (!emailId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required parameter: emailId'
+            });
+        }
+        
+        console.log(`[Events] Received generated event for email ${emailId}`);
+        
+        // Start simulation
+        simulateUserFlow(
+            emailId,
+            userId || 'anonymous',
+            campaignId || 'default',
+            attackLevel || 'advanced',
+            metadata || {}
+        );
+        
+        res.json({
+            success: true,
+            message: 'Event logged and simulation started',
+            emailId
+        });
+    } catch (error) {
+        console.error('[Events] Error logging generated event:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint: GET /metrics/latest
+// Returns current engagement metrics
+app.get('/metrics/latest', (req, res) => {
+    try {
+        const campaignId = req.query.campaignId || null;
+        const metrics = calculateMetrics(campaignId);
+        
+        res.json({
+            success: true,
+            metrics,
+            totalEvents: events.length
+        });
+    } catch (error) {
+        console.error('[Metrics] Error calculating metrics:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint: GET /events
+// Returns all events (for debugging)
+app.get('/events', (req, res) => {
+    try {
+        const campaignId = req.query.campaignId || null;
+        let filteredEvents = events;
+        
+        if (campaignId) {
+            filteredEvents = events.filter(e => e.campaignId === campaignId);
+        }
+        
+        res.json({
+            success: true,
+            events: filteredEvents,
+            total: filteredEvents.length
+        });
+    } catch (error) {
+        console.error('[Events] Error retrieving events:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint: DELETE /events
+// Clear all events (for testing/reset)
+app.delete('/events', (req, res) => {
+    try {
+        const count = events.length;
+        events.length = 0; // Clear array
+        console.log(`[Events] Cleared ${count} events`);
+        
+        res.json({
+            success: true,
+            message: `Cleared ${count} events`
+        });
+    } catch (error) {
+        console.error('[Events] Error clearing events:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// ============================================================================
+// Static Files and API Proxy
+// ============================================================================
+
 // Serve static files
 app.use(express.static('.'));
 
 // Create a proxy for both Hugging Face and Claude APIs
-app.use('/api/proxy', express.json(), async (req, res) => {
+app.use('/api/proxy', async (req, res) => {
     try {
         const { provider, model, inputs, parameters, token, claudeToken } = req.body;
         
@@ -213,5 +552,10 @@ app.listen(PORT, () => {
     console.log(`🚀 Local server running at http://localhost:${PORT}`);
     console.log(`📁 Serving static files from current directory`);
     console.log(`🔗 API proxy available at http://localhost:${PORT}/api/proxy`);
+    console.log(`📊 User engagement simulation endpoints:`);
+    console.log(`   - POST /events/generated - Log email generation events`);
+    console.log(`   - GET /metrics/latest - Get engagement metrics`);
+    console.log(`   - GET /events - Get all events (debugging)`);
+    console.log(`   - DELETE /events - Clear all events (testing)`);
     console.log(`\n✅ Visit: http://localhost:${PORT}`);
 });

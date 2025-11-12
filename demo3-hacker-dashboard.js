@@ -26,16 +26,43 @@ class HackerDashboard {
             this.updateEvaluationDisplay(event.detail);
         });
         
-        // Poll for metrics updates
+        // Poll for evaluation metrics updates (detection metrics)
         setInterval(() => {
             this.loadEvaluationMetrics();
         }, 3000);
+        
+        // Poll for engagement metrics updates (user behavior)
+        setInterval(() => {
+            this.loadEngagementMetricsAndUpdate();
+        }, 5000); // Poll every 5 seconds
+    }
+    
+    // Load engagement metrics and update display
+    async loadEngagementMetricsAndUpdate() {
+        const engagementMetrics = await this.loadEngagementMetrics();
+        if (engagementMetrics) {
+            this.updateEngagementMetrics(engagementMetrics);
+        }
+    }
+    
+    // Update engagement metrics display
+    updateEngagementMetrics(metrics) {
+        // Store metrics for display
+        this.engagementMetrics = metrics;
+        
+        // Update evaluation display if it exists
+        const evalPanel = document.getElementById('evaluationMetricsPanel');
+        if (evalPanel && this.lastEvaluationMetrics) {
+            // Re-render with engagement metrics
+            this.updateEvaluationDisplay(this.lastEvaluationMetrics);
+        }
     }
     
     loadEvaluationMetrics() {
         const saved = localStorage.getItem('demo3_evaluation_metrics');
         if (saved) {
             const metrics = JSON.parse(saved);
+            this.lastEvaluationMetrics = metrics; // Store for engagement metrics integration
             this.updateKPIs(metrics);
             this.updateEvaluationDisplay(metrics);
         }
@@ -335,6 +362,74 @@ class HackerDashboard {
                 
                 ${this.formatMetricsByLevel(metrics.byAttackLevel)}
                 ${this.formatMetricsByModel(metrics.byModel)}
+                
+                ${this.engagementMetrics ? this.formatEngagementMetrics(this.engagementMetrics) : ''}
+            </div>
+        `;
+    }
+    
+    formatEngagementMetrics(engagement) {
+        if (!engagement || engagement.sent === 0) return '';
+        
+        // Determine success threshold
+        const clickRate = engagement.clickRate || 0;
+        const successLevel = clickRate > 15 ? 'high' : clickRate > 7 ? 'moderate' : 'low';
+        const successColor = successLevel === 'high' ? '#00ff88' : successLevel === 'moderate' ? '#ffaa00' : '#ff4444';
+        
+        return `
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #333;">
+                <h4 style="color: #667eea; margin-bottom: 15px;"><i class="fas fa-mouse-pointer"></i> User Engagement Metrics (Simulated)</h4>
+                <div style="background: #0f1529; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <p style="color: #888; font-size: 12px; margin: 0 0 10px 0;">
+                        Simulated user behavior based on real-world phishing statistics. Metrics update in real-time as simulated users interact with emails.
+                    </p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Emails Sent</div>
+                            <div style="color: #fff; font-size: 20px; font-weight: bold;">${engagement.sent}</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Opened</div>
+                            <div style="color: #667eea; font-size: 20px; font-weight: bold;">${engagement.opened}</div>
+                            <div style="color: #888; font-size: 11px;">${engagement.openRate}% open rate</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Clicked</div>
+                            <div style="color: ${successColor}; font-size: 20px; font-weight: bold;">${engagement.clicked}</div>
+                            <div style="color: #888; font-size: 11px;">${engagement.clickRate}% click rate</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Click-Through Rate</div>
+                            <div style="color: #ffaa00; font-size: 20px; font-weight: bold;">${engagement.clickThroughRate}%</div>
+                            <div style="color: #888; font-size: 11px;">${engagement.clicked}/${engagement.opened} clicked after open</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Reported</div>
+                            <div style="color: #ff4444; font-size: 20px; font-weight: bold;">${engagement.reported}</div>
+                            <div style="color: #888; font-size: 11px;">${engagement.reportRate}% report rate</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Avg Time to Open</div>
+                            <div style="color: #667eea; font-size: 20px; font-weight: bold;">${engagement.avgTimeToOpen.toFixed(1)}m</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 12px;">Median Time to Click</div>
+                            <div style="color: ${successColor}; font-size: 20px; font-weight: bold;">${engagement.medianTimeToClick > 0 ? engagement.medianTimeToClick.toFixed(1) + 'm' : '-'}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: #1a1f35; border-radius: 6px; border-left: 3px solid ${successColor};">
+                        <div style="color: #fff; font-size: 13px; font-weight: bold; margin-bottom: 5px;">
+                            Campaign Effectiveness: <span style="color: ${successColor}; text-transform: capitalize;">${successLevel}</span>
+                        </div>
+                        <div style="color: #888; font-size: 11px;">
+                            ${successLevel === 'high' 
+                                ? '✓ High click rate indicates effective phishing campaign' 
+                                : successLevel === 'moderate' 
+                                ? '⚠ Moderate click rate - campaign is partially effective' 
+                                : '✗ Low click rate - campaign needs improvement'}
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
     }
@@ -821,7 +916,7 @@ Return ONLY the JSON object, nothing else.`;
             // Generate unique ID with timestamp, persona ID, and random component
             const uniqueId = `email_${Date.now()}_${persona.id}_${Math.random().toString(36).substring(2, 9)}`;
             
-            return {
+            const email = {
                 id: uniqueId,
                 campaignId: this.currentCampaign.id,
                 targetPersona: persona,
@@ -837,6 +932,15 @@ Return ONLY the JSON object, nothing else.`;
                 urls: urls, // Store URLs for analysis
                 status: 'delivered'
             };
+            
+            // Log email generation event to backend for user engagement simulation
+            this.logEmailGenerated(email.id, this.currentCampaign.id, email.attackLevel, {
+                subject: email.subject,
+                target: persona.name,
+                model: model
+            });
+            
+            return email;
 
         } catch (error) {
             console.error('Email generation error:', error);
@@ -860,6 +964,59 @@ Return ONLY the JSON object, nothing else.`;
     generateSenderEmail(senderName) {
         const domains = ['operations@securebank.com', 'it-support@banking-services.com', 'security@firstnational.com', 'compliance@financialcorp.com'];
         return domains[Math.floor(Math.random() * domains.length)];
+    }
+    
+    // Log email generation event to backend for user engagement simulation
+    async logEmailGenerated(emailId, campaignId, attackLevel, metadata = {}) {
+        try {
+            const response = await fetch('/events/generated', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    emailId,
+                    userId: 'hacker-dashboard',
+                    campaignId: campaignId.toString(),
+                    attackLevel,
+                    subject: metadata.subject,
+                    metadata
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`[Engagement] Logged email ${emailId} for user engagement simulation`);
+            } else {
+                console.warn(`[Engagement] Failed to log email ${emailId}:`, await response.text());
+            }
+        } catch (error) {
+            console.error(`[Engagement] Error logging email ${emailId}:`, error);
+            // Don't throw - this is not critical for email generation
+        }
+    }
+    
+    // Load engagement metrics from backend
+    async loadEngagementMetrics() {
+        try {
+            const campaignId = this.currentCampaign ? this.currentCampaign.id.toString() : null;
+            const url = campaignId 
+                ? `/metrics/latest?campaignId=${campaignId}`
+                : '/metrics/latest';
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn('[Engagement] Failed to load engagement metrics:', await response.text());
+                return null;
+            }
+            
+            const data = await response.json();
+            if (data.success && data.metrics) {
+                return data.metrics;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('[Engagement] Error loading engagement metrics:', error);
+            return null;
+        }
     }
 
     saveEmailsToBankInbox() {
