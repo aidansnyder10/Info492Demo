@@ -1,1 +1,32 @@
-.vercel
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+agent.log
+
+# Environment variables and secrets
+.env
+*.env
+OPENROUTER_API_KEY
+
+# Generated data files
+bank-inbox.json
+agent-metrics.json
+evaluation-metrics.json
+metrics/
+*.json.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp

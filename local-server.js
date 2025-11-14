@@ -1,9 +1,10 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const PORT = 8000;
+const PORT = process.env.PORT || 8002; // Default to 8002 (Team 2), override with PORT env var for Team 4
 
 // ============================================================================
 // User Engagement Simulation Engine
@@ -351,6 +352,194 @@ app.delete('/events', (req, res) => {
 });
 
 // ============================================================================
+// Agent API Endpoints (for autonomous agent communication)
+// ============================================================================
+
+// Endpoint: POST /api/agent/deploy-emails
+// Allows the autonomous agent to deploy emails to the bank inbox
+app.post('/api/agent/deploy-emails', (req, res) => {
+    try {
+        const { emails } = req.body;
+        
+        if (!emails || !Array.isArray(emails)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing or invalid emails array'
+            });
+        }
+
+        // Load existing emails from localStorage simulation (using a JSON file)
+        const inboxFile = './bank-inbox.json';
+        let existingEmails = [];
+        
+        try {
+            if (fs.existsSync(inboxFile)) {
+                const data = fs.readFileSync(inboxFile, 'utf8');
+                existingEmails = JSON.parse(data);
+            }
+        } catch (error) {
+            console.error('Error reading inbox file:', error);
+        }
+
+        // Add new emails
+        existingEmails.push(...emails);
+
+        // Save back to file
+        try {
+            fs.writeFileSync(inboxFile, JSON.stringify(existingEmails, null, 2));
+        } catch (error) {
+            console.error('Error writing inbox file:', error);
+        }
+
+        // Also trigger browser localStorage update via events (if browsers are connected)
+        // This is a simulation - in a real system, you'd use WebSockets or Server-Sent Events
+        
+        console.log(`[Agent] Deployed ${emails.length} emails to bank inbox`);
+        
+        res.json({
+            success: true,
+            message: `Deployed ${emails.length} emails`,
+            totalEmails: existingEmails.length
+        });
+    } catch (error) {
+        console.error('[Agent] Error deploying emails:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint: GET /api/agent/status
+// Returns agent status and recent activity
+app.get('/api/agent/status', (req, res) => {
+    try {
+        const agentMetricsFile = './agent-metrics.json';
+        const inboxFile = './bank-inbox.json';
+        
+        let agentStatus = {
+            isRunning: false,
+            totalCycles: 0,
+            totalEmailsGenerated: 0,
+            lastCycleTime: null,
+            uptime: null
+        };
+        
+        let recentEmails = [];
+        
+        // Load agent metrics
+        try {
+            if (fs.existsSync(agentMetricsFile)) {
+                const data = fs.readFileSync(agentMetricsFile, 'utf8');
+                const metrics = JSON.parse(data);
+                const startTime = new Date(metrics.startTime);
+                const uptime = Date.now() - startTime.getTime();
+                
+                agentStatus = {
+                    isRunning: true, // Assume running if metrics file exists and was recently updated
+                    totalCycles: metrics.totalCycles || 0,
+                    totalEmailsGenerated: metrics.totalEmailsGenerated || 0,
+                    successfulGenerations: metrics.successfulGenerations || 0,
+                    failedGenerations: metrics.failedGenerations || 0,
+                    lastCycleTime: metrics.lastCycleTime,
+                    startTime: metrics.startTime,
+                    uptime: {
+                        days: Math.floor(uptime / (1000 * 60 * 60 * 24)),
+                        hours: Math.floor((uptime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                        minutes: Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60))
+                    }
+                };
+            }
+        } catch (error) {
+            console.error('Error reading agent metrics:', error);
+        }
+        
+        // Load recent emails
+        try {
+            if (fs.existsSync(inboxFile)) {
+                const data = fs.readFileSync(inboxFile, 'utf8');
+                const emails = JSON.parse(data);
+                // Get last 10 emails, most recent first
+                recentEmails = emails.slice(-10).reverse();
+            }
+        } catch (error) {
+            console.error('Error reading inbox file:', error);
+        }
+        
+        res.json({
+            success: true,
+            agent: agentStatus,
+            recentEmails: recentEmails
+        });
+    } catch (error) {
+        console.error('[Agent] Error getting status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// Endpoint: GET /api/agent/metrics
+// Returns current industry metrics for the agent to monitor
+app.get('/api/agent/metrics', (req, res) => {
+    try {
+        // Load evaluation metrics (simulated from localStorage)
+        const metricsFile = './evaluation-metrics.json';
+        let metrics = {
+            totalEmails: 0,
+            detected: 0,
+            bypassed: 0,
+            detectionRate: 0,
+            bypassRate: 0
+        };
+
+        try {
+            if (fs.existsSync(metricsFile)) {
+                const data = fs.readFileSync(metricsFile, 'utf8');
+                const savedMetrics = JSON.parse(data);
+                metrics = {
+                    totalEmails: savedMetrics.totalSent || 0,
+                    detected: savedMetrics.detected || 0,
+                    bypassed: savedMetrics.bypassed || 0,
+                    detectionRate: savedMetrics.detectionRate || 0,
+                    bypassRate: savedMetrics.bypassRate || 0,
+                    timestamp: savedMetrics.timestamp
+                };
+            }
+        } catch (error) {
+            console.error('Error reading metrics file:', error);
+        }
+
+        // Also check inbox file for total count
+        const inboxFile = './bank-inbox.json';
+        try {
+            if (fs.existsSync(inboxFile)) {
+                const data = fs.readFileSync(inboxFile, 'utf8');
+                const emails = JSON.parse(data);
+                metrics.totalEmails = emails.length;
+            }
+        } catch (error) {
+            // Ignore
+        }
+
+        res.json({
+            success: true,
+            metrics
+        });
+    } catch (error) {
+        console.error('[Agent] Error getting metrics:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+            message: error.message
+        });
+    }
+});
+
+// ============================================================================
 // Static Files and API Proxy
 // ============================================================================
 
@@ -548,14 +737,17 @@ app.use('/api/proxy', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Local server running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    const host = process.env.HOST || '0.0.0.0';
+    const serverUrl = `http://is-info492.ischool.uw.edu:${PORT}`;
+    console.log(`🚀 Server running on ${host}:${PORT}`);
     console.log(`📁 Serving static files from current directory`);
-    console.log(`🔗 API proxy available at http://localhost:${PORT}/api/proxy`);
+    console.log(`🔗 API proxy available at ${serverUrl}/api/proxy`);
     console.log(`📊 User engagement simulation endpoints:`);
     console.log(`   - POST /events/generated - Log email generation events`);
     console.log(`   - GET /metrics/latest - Get engagement metrics`);
     console.log(`   - GET /events - Get all events (debugging)`);
     console.log(`   - DELETE /events - Clear all events (testing)`);
-    console.log(`\n✅ Visit: http://localhost:${PORT}`);
+    console.log(`\n✅ Demo URL: ${serverUrl}/demo3.html`);
+    console.log(`✅ Local access: http://localhost:${PORT}/demo3.html`);
 });
