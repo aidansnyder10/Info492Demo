@@ -27,6 +27,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Deployment files
+.vercel/
+
 # Temporary files
 *.tmp
 *.temp
