@@ -9,7 +9,7 @@
 Create a file named `.env` in the project root:
 
 ```bash
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=your_api_key_here
 PORT=3000
 ```
 
@@ -19,8 +19,7 @@ PORT=3000
 
 **Option A: Use environment variables directly (recommended for PM2)**
 
-```bash
-export OPENROUTER_API_KEY=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
+export OPENROUTER_API_KEY=your_api_key_here
 pm2 delete all
 PORT=3000 OPENROUTER_API_KEY=$OPENROUTER_API_KEY pm2 start local-server.js --name "industry"
 OPENROUTER_API_KEY=$OPENROUTER_API_KEY pm2 start autonomous-agent.js --name "agent"
@@ -31,7 +30,7 @@ pm2 save
 
 ```bash
 cd ~/teams/team2
-echo "OPENROUTER_API_KEY=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" > .env
+echo "OPENROUTER_API_KEY=your_api_key_here" > .env
 echo "PORT=3000" >> .env
 chmod 600 .env  # Make it readable only by you
 npm install  # Install dotenv if not already installed
