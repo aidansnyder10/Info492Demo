@@ -1,3 +1,10 @@
+// Load environment variables from .env file if it exists
+try {
+    require('dotenv').config();
+} catch (e) {
+    // dotenv not installed, that's okay - use environment variables directly
+}
+
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');

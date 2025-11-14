@@ -2,6 +2,13 @@
 // Team 2: Finance - Offense
 // This agent continuously generates and deploys phishing attacks
 
+// Load environment variables from .env file if it exists
+try {
+    require('dotenv').config();
+} catch (e) {
+    // dotenv not installed, that's okay - use environment variables directly
+}
+
 const fs = require('fs');
 const path = require('path');
 

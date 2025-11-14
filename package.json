@@ -8,11 +8,17 @@
     "dev": "node local-server.js"
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
     "express": "^4.18.2",
     "http-proxy-middleware": "^2.0.6",
     "node-fetch": "^2.7.0"
   },
-  "keywords": ["demo", "ai", "banking", "security"],
+  "keywords": [
+    "demo",
+    "ai",
+    "banking",
+    "security"
+  ],
   "author": "Info492 Demo",
   "license": "MIT"
 }
