@@ -7,7 +7,7 @@ const path = require('path');
 
 // Configuration
 const CONFIG = {
-    INDUSTRY_URL: process.env.INDUSTRY_URL || 'http://localhost:8002',
+    INDUSTRY_URL: process.env.INDUSTRY_URL || 'http://localhost:3000',
     AGENT_TYPE: 'offense', // Team 2 is offense
     CYCLE_INTERVAL_MINUTES: 5, // Run attack cycle every 5 minutes
     MAX_TARGETS_PER_CYCLE: 3, // Attack 3 targets per cycle

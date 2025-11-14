@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 8002; // Default to 8002 (Team 2), override with PORT env var for Team 4
+const PORT = process.env.PORT || 3000; // Default to 3000, override with PORT env var
 
 // ============================================================================
 // User Engagement Simulation Engine
