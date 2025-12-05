@@ -51,14 +51,45 @@ Authentication: <how roles are authenticated and scoped>
 Data: synthetic only; generator + brief schema description
 
 
-5) Experiments Summary (Demos #3 - #5)
-Demo #3: <hypothesis> — <setup> — Result: <pass/fail + one sentence> — Evidence: <link/note>
+5) Experiments Summary (Demos #3 – #5)
 
+**Demo #3**
+**Overview:**  
+In Demo 3, we introduced the initial attack engine and produced bypass-rate estimates. However, these metrics were derived from publicly available *average industry bypass rates*, which limited the accuracy of evaluation.
 
-Demo #4 (continuous run): uptime <xx.x%>, incidents <n>, Improvement observed: <yes/no + brief>
+**Result:**  
+Pass (functionality validated, but accuracy limited).
 
+**Evidence:**  
+Bypass-rate estimates based on external online benchmark statistics.
 
-Demo #5 (final): <what was validated> — Result: <one sentence> — Evidence: <link/note>
+---
+
+**Demo #4** (Continuous Run)
+**Overview:**  
+Demo 4 replaced external benchmarks with a custom-designed defense system mechanism that simulates how real financial institutions detect and block phishing emails. By using rule-based detection and heuristic scoring, the bypass rate became grounded in actual system interactions.
+
+**Uptime:**  
+Stable continuous operation.
+
+**Incidents:**  
+Multiple realistic detections and blocks recorded.
+
+**Improvement Observed:**  
+Yes. Bypass-rate calculations transitioned from approximated benchmarks to real simulated defense results, significantly improving accuracy.
+
+---
+
+**Demo #5 (Final)**
+**Overview:**  
+Demo 5 introduced a fully autonomous **self-training model**, enabling the agent to evaluate its strategies, track personas, and iteratively improve phishing-email content based on real performance outcomes. Combined with the realistic defense layer from Demo 4, the system now forms a complete generate → test → learn → improve loop.
+
+**Result:**  
+Pass with major advancement. The agent shows measurable learning and increasingly effective phishing-content optimization.
+
+**Evidence:**  
+Live Autonomous Agent Monitor showing 370+ cycles, empirical bypass/detection statistics, and real-time self-training metrics.
+
 
 
 6) Key Results (plain text)
@@ -102,16 +133,20 @@ Evidence folder (logs/screens): /evidence/
 
 
 10) Next Steps
-<Top improvement 1>
 
+**Improvement 1: Build a More Authentic Banking-Grade Cybersecurity Defense System**
 
-<Top improvement 2>
+The current defense mechanism provides a useful simulation layer but lacks the depth and complexity of real financial-institution security stacks. A major next step is constructing a more realistic defense framework incorporating features such as multi-stage filtering, anomaly detection, attachment/link scanners, domain reputation systems, and behavior-based threat scoring. This would allow the agent to train against defenses that closely resemble production banking environments.
 
+**Improvement 2: Expand the Self-Training Framework into a Multi-Model Reinforcement Loop**
 
-<Top improvement 3>
+While Demo 5 introduced effective self-training based on tactic success rates, the system can be further strengthened by integrating reinforcement-learning components, cross-model evaluations, and adaptive weighting across personas and strategies. This would allow the agent to improve not only content but also decision-making policies, urgency tuning, and target-personalization strategies in a more sophisticated learning loop.
 
+**Improvement 3: Develop a Full End-to-End Simulation Pipeline with Realistic User Behavior Modeling**
 
-Maintainers: <names> • Contact: <email>
+Currently, click rates and vulnerability scoring are derived from system-level metrics rather than modeled human behavior. A future improvement is to simulate realistic user interactions—such as probabilistic click models, delayed responses, report likelihood, and behavioral variability across demographics or job roles. This would make the overall system significantly more accurate when evaluating real-world phishing effectiveness and user susceptibility patterns.
+
+Maintainers: INFO492 Group2 • Contact: arielx@uw.edu
 
 
 # SecureBank Admin Portal
